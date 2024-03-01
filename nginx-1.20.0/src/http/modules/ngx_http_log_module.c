@@ -161,6 +161,14 @@ static char *ngx_http_log_open_file_cache(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 static ngx_int_t ngx_http_log_init(ngx_conf_t *cf);
 
+static ngx_int_t
+ngx_http_my_module_log_request(ngx_http_request_t *r);
+
+static void
+ngx_http_my_module_log_response(ngx_http_request_t *r);
+
+static ngx_int_t
+ngx_http_my_module_handler(ngx_http_request_t *r);
 
 static ngx_command_t  ngx_http_log_commands[] = {
 
@@ -1904,6 +1912,79 @@ ngx_http_log_init(ngx_conf_t *cf)
     }
 
     *h = ngx_http_log_handler;
+    
+    ngx_http_handler_pt        *h_my;
+    
+    h_my = ngx_array_push(&cmcf->phases[NGX_HTTP_LOG_PHASE].handlers);
+    if (h_my == NULL) {
+        return NGX_ERROR;
+    }
+
+    *h_my = ngx_http_my_module_handler;
+    return NGX_OK;
+}
+
+static ngx_int_t
+ngx_http_my_module_log_request(ngx_http_request_t *r)
+{
+    ngx_list_part_t *part;
+    ngx_table_elt_t *header;
+    ngx_uint_t i;
+
+    ngx_log_error(NGX_LOG_INFO, r->connection->log, 0, "Received request:");
+    ngx_log_error(NGX_LOG_INFO, r->connection->log, 0, "Method: %V", &r->method_name);
+    ngx_log_error(NGX_LOG_INFO, r->connection->log, 0, "URI: %V", &r->uri);
+    ngx_log_error(NGX_LOG_INFO, r->connection->log, 0, "HTTP version: HTTP/%d.%d", r->http_major, r->http_minor);
+
+    part = &r->headers_in.headers.part;
+    header = part->elts;
+
+    for (i = 0; /* void */; i++) {
+        if (i >= part->nelts) {
+            if (part->next == NULL) {
+                break;
+            }
+            part = part->next;
+            header = part->elts;
+            i = 0;
+        }
+
+        ngx_log_error(NGX_LOG_INFO, r->connection->log, 0, "%V: %V", &header[i].key, &header[i].value);
+    }
 
     return NGX_OK;
 }
+
+static void
+ngx_http_my_module_log_response(ngx_http_request_t *r)
+{
+    ngx_log_error(NGX_LOG_INFO, r->connection->log, 0, "Sent response:");
+    ngx_log_error(NGX_LOG_INFO, r->connection->log, 0, "Status code: %ui", r->headers_out.status);
+}
+
+static ngx_int_t
+ngx_http_my_module_handler(ngx_http_request_t *r)
+{
+    if (r->method == NGX_HTTP_GET) {
+        ngx_http_my_module_log_request(r);
+        // Логика обработки GET запроса
+        ngx_http_my_module_log_response(r);
+    } else if (r->method == NGX_HTTP_POST) {
+        ngx_http_my_module_log_request(r);
+        // Логика обработки POST запроса
+        ngx_http_my_module_log_response(r);
+    } else if (r->method == NGX_HTTP_PUT) {
+        ngx_http_my_module_log_request(r);
+        // Логика обработки PUT запроса
+        ngx_http_my_module_log_response(r);
+    } else if (r->method == NGX_HTTP_DELETE) {
+        ngx_http_my_module_log_request(r);
+        // Логика обработки DELETE запроса
+        ngx_http_my_module_log_response(r);
+    } else {
+        // Обработка других методов HTTP
+    }
+
+    return NGX_OK;
+}
+
